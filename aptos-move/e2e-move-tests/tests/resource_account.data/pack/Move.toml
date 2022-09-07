@@ -1,0 +1,10 @@
+[package]
+name = "test_package"
+version = "0.0.0"
+upgrade_policy = "compatible"
+
+[dependencies]
+AptosFramework = { local = "../../../../framework/aptos-framework" }
+
+[addresses]
+resource_account = "0x0b6beee9bc1ad3177403a04efeefb1901c12b7b575ac5124c0205efc0dd2e32a"
