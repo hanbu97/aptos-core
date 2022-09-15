@@ -46,6 +46,7 @@ use std::{
     time::Instant,
 };
 use thiserror::Error;
+use aptos_logger::info;
 
 const MAX_POSSIBLE_GAS_UNITS: u64 = 1_000_000;
 
@@ -471,6 +472,7 @@ pub struct RngArgs {
 
 impl RngArgs {
     pub fn from_seed(seed: [u8; 32]) -> RngArgs {
+        info!("********************* from seed {}", hex::encode(seed));
         RngArgs {
             random_seed: Some(hex::encode(seed)),
         }
@@ -484,6 +486,7 @@ impl RngArgs {
             let mut seed_slice = [0u8; 32];
 
             hex::decode_to_slice(seed, &mut seed_slice)?;
+            println!(".....................Calling from RangArgs");
             Ok(KeyGen::from_seed(seed_slice))
         } else {
             Ok(KeyGen::from_os_rng())

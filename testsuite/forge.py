@@ -1277,6 +1277,7 @@ def test(
     forge_cli_args: Optional[List[str]],
     test_args: Optional[List[str]],
 ) -> None:
+    forge_test_suite = "validators_join_and_leave"
     """Run a forge test"""
     shell = LocalShell(verbose == "true")
     git = Git(shell)

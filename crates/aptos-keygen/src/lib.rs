@@ -19,6 +19,11 @@ pub struct KeyGen(StdRng);
 impl KeyGen {
     /// Constructs a key generator with a specific seed.
     pub fn from_seed(seed: [u8; 32]) -> Self {
+        panic!("This is a serious bug");
+        println!("KeyGen:from seed:");
+        for x in seed {
+            println!(".............{}", x);
+        }
         Self(StdRng::from_seed(seed))
     }
 

@@ -16,7 +16,10 @@ use crate::common::types::{
     MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions,
     PublicKeyInputOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
+
+#[cfg(feature = "cli-framework-test-move")]
 use crate::common::utils::write_to_file;
+
 use crate::move_tool::{
     ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
     PublishPackage, RunFunction, TestPackage,
@@ -38,7 +41,7 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
-use aptos_logger::warn;
+use aptos_logger::{info, warn};
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
@@ -49,7 +52,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, path::PathBuf, str::FromStr, time::Duration};
+
+#[cfg(feature = "cli-framework-test-move")]
 use thiserror::private::PathAsDisplay;
+
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -130,6 +136,7 @@ impl CliTestFramework {
 
     pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
         let address = account_address_from_public_key(&private_key.public_key());
+        info!("Account Address: {}", address.to_hex());
         self.account_addresses.push(address);
         self.account_keys.push(private_key);
         self.account_keys.len() - 1
@@ -662,6 +669,7 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
+    #[cfg(feature = "cli-framework-test-move")]
     pub fn add_move_files(&self) {
         let move_dir = self.move_dir();
         let sources_dir = move_dir.join("sources");
