@@ -1024,6 +1024,7 @@ dependencies = [
  "anyhow",
  "aptos-api-types",
  "aptos-crypto",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-types",
  "bcs",
