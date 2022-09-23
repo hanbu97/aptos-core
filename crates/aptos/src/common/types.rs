@@ -55,6 +55,19 @@ pub type CliResult = Result<String, String>;
 /// A common result to remove need for typing `Result<T, CliError>`
 pub type CliTypedResult<T> = Result<T, CliError>;
 
+/// Represents different type of stake pools.
+#[derive(Debug)]
+pub enum StakePoolType {
+    // No stake pool found.
+    None,
+    // Stake pool directly owned by an account.
+    Direct,
+    // Stake pool owned via a contract between the staker and operator.
+    StakingContract,
+    // Stake pool owned via employee vesting accounts.
+    Vesting,
+}
+
 /// CLI Errors for reporting through telemetry and outputs
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -86,6 +99,8 @@ pub enum CliError {
     UnexpectedError(String),
     #[error("Simulation failed with status: {0}")]
     SimulationError(String),
+    #[error("Unsupported operation: {0}")]
+    Unsupported(String),
 }
 
 impl CliError {
@@ -105,6 +120,7 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
+            CliError::Unsupported(_) => "Unsupported",
         }
     }
 }
@@ -1189,7 +1205,7 @@ pub struct TransactionOptions {
 
 impl TransactionOptions {
     /// Builds a rest client
-    fn rest_client(&self) -> CliTypedResult<Client> {
+    pub fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options.profile)
     }
 

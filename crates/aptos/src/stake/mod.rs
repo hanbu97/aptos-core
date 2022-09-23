@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+    CliCommand, CliError, CliResult, CliTypedResult, StakePoolType, TransactionOptions,
+    TransactionSummary,
 };
-use aptos_types::account_address::AccountAddress;
+use crate::common::utils::get_stake_pool_type;
+use aptos_types::account_address::{create_vesting_pool_address, AccountAddress};
 use async_trait::async_trait;
 use cached_packages::aptos_stdlib;
 use clap::Parser;
@@ -46,6 +48,11 @@ pub struct AddStake {
     #[clap(long)]
     pub amount: u64,
 
+    /// Required to identify which stake pool if the staker has staking contracts with operators or
+    /// administrates multiple vesting accounts..
+    #[clap(long)]
+    pub operator: Option<AccountAddress>,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -57,8 +64,22 @@ impl CliCommand<TransactionSummary> for AddStake {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let owner = self.txn_options.profile_options.account_address()?;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_add_stake(self.amount),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_add_stake(self.operator.unwrap(), self.amount)
+                }
+                _ => {
+                    return Err(CliError::Unsupported(
+                        "Adding stake is only supported for direct stake pool or staking contract"
+                            .into(),
+                    ))
+                }
+            };
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }
@@ -73,6 +94,11 @@ pub struct UnlockStake {
     #[clap(long)]
     pub amount: u64,
 
+    /// Required to identify which stake pool if the staker has staking contracts with operators or
+    /// administrates multiple vesting accounts..
+    #[clap(long)]
+    pub operator: Option<AccountAddress>,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -84,8 +110,20 @@ impl CliCommand<TransactionSummary> for UnlockStake {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let owner = self.txn_options.profile_options.account_address()?;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_unlock(self.amount),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_unlock_stake(self.operator.unwrap(), self.amount)
+                }
+                _ => return Err(CliError::Unsupported(
+                    "Unlocking stake is only supported for direct stake pool or staking contract"
+                        .into(),
+                )),
+            };
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }
@@ -101,8 +139,17 @@ pub struct WithdrawStake {
     #[clap(long)]
     pub amount: u64,
 
+    /// Required to identify which stake pool if the staker has staking contracts with operators or
+    /// administrates multiple vesting accounts..
+    #[clap(long)]
+    pub operator: Option<AccountAddress>,
+
+    /// Required to identify which vesting contract if the owner administrates multiples.
+    #[clap(long)]
+    pub vesting_contract_index: Option<u64>,
+
     #[clap(flatten)]
-    pub(crate) node_op_options: TransactionOptions,
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -112,8 +159,30 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        self.node_op_options
-            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
+        let owner = self.txn_options.profile_options.account_address()?;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_withdraw(self.amount),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_distribute(owner, self.operator.unwrap())
+                }
+                StakePoolType::Vesting => {
+                    let vesting_contract_address = create_vesting_pool_address(
+                        owner,
+                        self.operator.unwrap(),
+                        self.vesting_contract_index.unwrap(),
+                        &[],
+                    );
+                    aptos_stdlib::vesting_distribute(vesting_contract_address)
+                }
+                _ => {
+                    return Err(CliError::ConfigNotFoundError(
+                        "Account has no stake pool associated".into(),
+                    ))
+                }
+            };
+        self.txn_options
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }
@@ -126,6 +195,15 @@ impl CliCommand<TransactionSummary> for WithdrawStake {
 pub struct IncreaseLockup {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+
+    /// Required to identify which stake pool if the staker has staking contracts with operators or
+    /// administrates multiple vesting accounts.
+    #[clap(long)]
+    pub operator: Option<AccountAddress>,
+
+    /// Required to identify which vesting contract if the owner administrates multiples.
+    #[clap(long)]
+    pub vesting_contract_index: Option<u64>,
 }
 
 #[async_trait]
@@ -135,8 +213,30 @@ impl CliCommand<TransactionSummary> for IncreaseLockup {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let owner = self.txn_options.profile_options.account_address()?;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_increase_lockup(),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_reset_lockup(self.operator.unwrap())
+                }
+                StakePoolType::Vesting => {
+                    let vesting_contract_address = create_vesting_pool_address(
+                        owner,
+                        self.operator.unwrap(),
+                        self.vesting_contract_index.unwrap(),
+                        &[],
+                    );
+                    aptos_stdlib::vesting_reset_lockup(vesting_contract_address)
+                }
+                _ => {
+                    return Err(CliError::ConfigNotFoundError(
+                        "Account has no stake pool associated".into(),
+                    ))
+                }
+            };
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup())
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }
@@ -196,6 +296,14 @@ pub struct SetOperator {
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: AccountAddress,
 
+    /// Required to identify which stake pool if the staker has staking contracts with operators.
+    #[clap(long)]
+    pub old_operator: Option<AccountAddress>,
+
+    /// Required to identify which vesting contract if the owner administrates multiples.
+    #[clap(long)]
+    pub vesting_contract_index: Option<u64>,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -207,8 +315,37 @@ impl CliCommand<TransactionSummary> for SetOperator {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let owner = self.txn_options.profile_options.account_address()?;
+        let operator = self.operator_address;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_set_operator(operator),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_switch_operator_with_same_commission(
+                        self.old_operator.unwrap(),
+                        operator,
+                    )
+                }
+                StakePoolType::Vesting => {
+                    let vesting_contract_address = create_vesting_pool_address(
+                        owner,
+                        operator,
+                        self.vesting_contract_index.unwrap(),
+                        &[],
+                    );
+                    aptos_stdlib::vesting_update_operator_with_same_commission(
+                        vesting_contract_address,
+                        operator,
+                    )
+                }
+                _ => {
+                    return Err(CliError::ConfigNotFoundError(
+                        "Account has no stake pool associated".into(),
+                    ))
+                }
+            };
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_operator(self.operator_address))
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }
@@ -223,6 +360,14 @@ pub struct SetDelegatedVoter {
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: AccountAddress,
 
+    /// Required to identify which stake pool if the staker has staking contracts with operators.
+    #[clap(long)]
+    pub operator: Option<AccountAddress>,
+
+    /// Required to identify which vesting contract if the owner administrates multiples.
+    #[clap(long)]
+    pub vesting_contract_index: Option<u64>,
+
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -234,8 +379,31 @@ impl CliCommand<TransactionSummary> for SetDelegatedVoter {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let owner = self.txn_options.profile_options.account_address()?;
+        let voter = self.voter_address;
+        let payload =
+            match get_stake_pool_type(&self.txn_options.rest_client().unwrap(), owner).await {
+                StakePoolType::Direct => aptos_stdlib::stake_set_delegated_voter(voter),
+                StakePoolType::StakingContract => {
+                    aptos_stdlib::staking_contract_update_voter(self.operator.unwrap(), voter)
+                }
+                StakePoolType::Vesting => {
+                    let vesting_contract_address = create_vesting_pool_address(
+                        owner,
+                        self.operator.unwrap(),
+                        self.vesting_contract_index.unwrap(),
+                        &[],
+                    );
+                    aptos_stdlib::vesting_update_voter(vesting_contract_address, voter)
+                }
+                _ => {
+                    return Err(CliError::ConfigNotFoundError(
+                        "Account has no stake pool associated".into(),
+                    ))
+                }
+            };
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
+            .submit_transaction(payload)
             .await
             .map(|inner| inner.into())
     }

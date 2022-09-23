@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::StakePoolType;
 use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
@@ -337,6 +338,34 @@ pub async fn fund_account(
             "Faucet issue: {}",
             response.status()
         )))
+    }
+}
+
+pub async fn get_stake_pool_type(client: &Client, owner_address: AccountAddress) -> StakePoolType {
+    let stake_pool_exists = client
+        .get_resource::<Vec<u8>>(owner_address, "0x1::stake::StakePool")
+        .await
+        .is_ok();
+    if stake_pool_exists {
+        return StakePoolType::Direct;
+    };
+
+    let staking_contract_store_exists = client
+        .get_resource::<Vec<u8>>(owner_address, "0x1::staking_contract::Store")
+        .await
+        .is_ok();
+    if staking_contract_store_exists {
+        return StakePoolType::StakingContract;
+    };
+
+    let vesting_admin_store_exists = client
+        .get_resource::<Vec<u8>>(owner_address, "0x1::vesting::AdminStore")
+        .await
+        .is_ok();
+    if vesting_admin_store_exists {
+        StakePoolType::Vesting
+    } else {
+        StakePoolType::None
     }
 }
 

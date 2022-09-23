@@ -353,6 +353,7 @@ impl CliTestFramework {
 
     pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
         AddStake {
+            operator: None,
             txn_options: self.transaction_options(
                 index,
                 // TODO(greg): revisit after fixing gas estimation
@@ -373,6 +374,7 @@ impl CliTestFramework {
         amount: u64,
     ) -> CliTypedResult<TransactionSummary> {
         UnlockStake {
+            operator: None,
             txn_options: self.transaction_options(index, None),
             amount,
         }
@@ -386,7 +388,9 @@ impl CliTestFramework {
         amount: u64,
     ) -> CliTypedResult<TransactionSummary> {
         WithdrawStake {
-            node_op_options: self.transaction_options(index, None),
+            operator: None,
+            vesting_contract_index: None,
+            txn_options: self.transaction_options(index, None),
             amount,
         }
         .execute()
@@ -395,6 +399,8 @@ impl CliTestFramework {
 
     pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
         IncreaseLockup {
+            operator: None,
+            vesting_contract_index: None,
             txn_options: self.transaction_options(index, None),
         }
         .execute()
@@ -536,6 +542,8 @@ impl CliTestFramework {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
+            old_operator: None,
+            vesting_contract_index: None,
         }
         .execute()
         .await
@@ -549,6 +557,8 @@ impl CliTestFramework {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),
+            operator: None,
+            vesting_contract_index: None,
         }
         .execute()
         .await
