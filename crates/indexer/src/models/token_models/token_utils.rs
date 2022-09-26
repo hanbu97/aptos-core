@@ -10,7 +10,9 @@ use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Formatter};
 
-use crate::util::{deserialize_bcs_from_string, hash_str, truncate_str};
+use crate::util::{hash_str, truncate_str};
+
+use super::token_bcs_utils::{deserialize_string_from_bcs_hexstring, deserialize_string_from_hexstring};
 
 /**
  * This file defines deserialized move types as defined in our 0x3 contracts.
@@ -287,9 +289,9 @@ pub struct ClaimTokenEventType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TypeInfo {
     pub account_address: String,
-    // #[serde(deserialize_with = "deserialize_bcs_from_string")]
+    #[serde(deserialize_with = "deserialize_string_from_hexstring")]
     pub module_name: String,
-    // #[serde(deserialize_with = "deserialize_bcs_from_string")]
+    #[serde(deserialize_with = "deserialize_string_from_hexstring")]
     pub struct_name: String,
 }
 
