@@ -5,9 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
-use crate::{
-    schema::{collection_datas, current_collection_datas},
-};
+use crate::schema::{collection_datas, current_collection_datas};
 use anyhow::Context;
 use aptos_api_types::WriteTableItem as APIWriteTableItem;
 use bigdecimal::BigDecimal;
